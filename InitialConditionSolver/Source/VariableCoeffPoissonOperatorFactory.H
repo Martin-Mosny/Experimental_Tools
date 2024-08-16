@@ -16,6 +16,7 @@
 #include "PoissonParameters.H"
 #include "SetBCs.H"
 #include "VariableCoeffPoissonOperator.H"
+#include "UsingNamespace.H"
 
 // function to define operator factory
 extern AMRLevelOpFactory<LevelData<FArrayBox>> *

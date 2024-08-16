@@ -21,7 +21,7 @@
 #include "InterpF_F.H"
 #include "LayoutIterator.H"
 #include "Misc.H"
-#include "NamespaceHeader.H"
+//#include "NamespaceHeader.H"
 #include "VariableCoeffPoissonOperator.H"
 #include "VariableCoeffPoissonOperatorF_F.H"
 
@@ -408,4 +408,4 @@ void VariableCoeffPoissonOperator::finerOperatorChanged(
 }
 //-----------------------------------------------------------------------
 
-#include "NamespaceFooter.H"
+//#include "NamespaceFooter.H"

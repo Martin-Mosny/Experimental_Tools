@@ -7,6 +7,7 @@
 #define SETBINARYBH_HPP
 
 #include "PoissonParameters.H"
+#include <array>
 
 // Get the bh radius - input loc_bh should be location on the grid relative
 // to the centre - note that it gets corrected to the actual location
@@ -25,7 +26,7 @@ Real get_Aij(const int i, const int j, const Real &rbh1, const Real &rbh2,
              const RealVect &J2, const RealVect &P1, const RealVect &P2,
              const PoissonParameters &a_params)
 {
-    std::array<std::array<std::array<double, 3>, 3>, 3> epsilon = {0.};
+    std::array<std::array<std::array<double, 3>, 3>, 3> epsilon = {};
     epsilon[0][1][2] = 1.0;
     epsilon[1][2][0] = 1.0;
     epsilon[2][0][1] = 1.0;

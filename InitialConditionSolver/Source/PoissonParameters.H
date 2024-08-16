@@ -19,6 +19,7 @@ using std::cerr;
 #include "FArrayBox.H"
 #include "ParmParse.H"
 #include "VariableCoeffPoissonOperator.H"
+#include "UsingNamespace.H"
 
 /// Class for solver input parameters
 /**

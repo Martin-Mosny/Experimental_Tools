@@ -16,9 +16,9 @@ beta  = -1.0
 L = 100.0
 N = 64 64 64
 # number of AMR refinement levels is max_level + 1
-max_level    = 6
+max_level    = 3
 # Threshold for AMR refinement, based on magnitude of rhs
-refine_threshold = 0.1
+refine_threshold = 1
 #min box size
 block_factor = 8
 #max box size
@@ -44,7 +44,7 @@ coefficient_average_type = harmonic
 
 # Boundary conditions for domain-boundary faces 
 # 0 for non periodic, 1 for periodic (enforces same for all)
-is_periodic = 0
+is_periodic = 1
 # if not periodic, then what?
 # 1 -> const Neumann (gradient), 0 -> const Dirichlet (value)
 bc_lo       = 0 0 0
@@ -57,8 +57,8 @@ bc_value = 0.0
 G_Newton = 1.0 
 
 # scalar field input params
-phi_amplitude = 0.1
-phi_wavelength = 1
+phi_amplitude = 0.01
+phi_wavelength = 0.5
 
 # initial conditions for Binary BH spacetimes
 # (can be with or without periodic BCs, 
@@ -66,7 +66,7 @@ phi_wavelength = 1
 # if you don't want BHs just set masses to zero
 
 #BH1
-bh1_bare_mass = 0.5
+bh1_bare_mass = 0
 # spin about z axis (this is J_z)
 bh1_spin = 0.1
 # boost in y direction (this is P_y)
@@ -75,7 +75,7 @@ bh1_momentum = 0.05
 bh1_offset = 10.0
 
 #BH2
-bh2_bare_mass = 0.5
+bh2_bare_mass = 0
 # spin about z axis (this is J_z)
 bh2_spin = 0.1
 # boost in y direction (this is P_y)

@@ -127,6 +127,8 @@ void set_rhs(LevelData<FArrayBox> &a_rhs,
              LevelData<FArrayBox> &a_multigrid_vars, const RealVect &a_dx,
              const PoissonParameters &a_params, const Real constant_K)
 {
+    Real massless_BH;
+    if (a_params.bh1_bare_mass == 0) {massless_BH = 0;} else {massless_BH = 1;}
 
     CH_assert(a_multigrid_vars.nComp() == NUM_MULTIGRID_VARS);
 
@@ -163,13 +165,13 @@ void set_rhs(LevelData<FArrayBox> &a_rhs,
                  2 * pow(multigrid_vars_box(iv, c_A13_0), 2.0) +
                  2 * pow(multigrid_vars_box(iv, c_A23_0), 2.0);
 
-            Real psi_bl = get_psi_brill_lindquist(loc, a_params);
-            Real psi_0 = multigrid_vars_box(iv, c_psi_reg) + psi_bl;
+            Real psi_bl = massless_BH*get_psi_brill_lindquist(loc, a_params);
+            Real psi_0 =  multigrid_vars_box(iv, c_psi_reg) + psi_bl;
 
-            rhs_box(iv, 0) = 0.125 * m * pow(psi_0, 5.0) -
-                             0.125 * A2 * pow(psi_0, -7.0) -
-                             M_PI * a_params.G_Newton * grad_phi_sq * psi_0 -
-                             laplacian_of_psi;
+            rhs_box(iv, 0) =  0.125 * m * pow(psi_0, 5.0) -
+                              //0.125 * A2 * pow(psi_0, -7.0) -
+                              M_PI * a_params.G_Newton * grad_phi_sq * psi_0 -
+                              laplacian_of_psi;
         }
     }
 } // end set_rhs
@@ -220,7 +222,7 @@ void set_constant_K_integrand(LevelData<FArrayBox> &a_integrand,
             Real psi_bl = get_psi_brill_lindquist(loc, a_params);
             Real psi_0 = multigrid_vars_box(iv, c_psi_reg) + psi_bl;
 
-            integrand_box(iv, 0) = -1.5 * m + 1.5 * A2 * pow(psi_0, -12.0) +
+            integrand_box(iv, 0) = -1.5 * m + //1.5 * A2 * pow(psi_0, -12.0) +
                                    12.0 * M_PI * a_params.G_Newton *
                                        grad_phi_sq * pow(psi_0, -4.0) +
                                    12.0 * laplacian_of_psi * pow(psi_0, -5.0);
@@ -271,7 +273,7 @@ void set_regrid_condition(LevelData<FArrayBox> &a_condition,
             // value of the contributions and add in BH criteria
             Real psi_bl = get_psi_brill_lindquist(loc, a_params);
             Real psi_0 = multigrid_vars_box(iv, c_psi_reg) + psi_bl;
-            condition_box(iv, 0) = 1.5 * abs(m) + 1.5 * A2 * pow(psi_0, -7.0) +
+            condition_box(iv, 0) = 1.5 * abs(m) + //1.5 * A2 * pow(psi_0, -7.0) +
                                    12.0 * M_PI * a_params.G_Newton *
                                        abs(grad_phi_sq) * pow(psi_0, 1.0) +
                                    log(psi_0);
@@ -361,9 +363,9 @@ void set_a_coef(LevelData<FArrayBox> &a_aCoef,
 
             Real psi_bl = get_psi_brill_lindquist(loc, a_params);
             Real psi_0 = multigrid_vars_box(iv, c_psi_reg) + psi_bl;
-            aCoef_box(iv, 0) = -0.625 * m * pow(psi_0, 4.0) -
-                               0.875 * A2 * pow(psi_0, -8.0) +
-                               M_PI * a_params.G_Newton * grad_phi_sq;
+            aCoef_box(iv, 0) = -0.625 * m * pow(psi_0, 4.0)
+                               //- 0.875 * A2 * pow(psi_0, -8.0)
+                               +M_PI * a_params.G_Newton * grad_phi_sq;
         }
     }
 }
@@ -428,7 +430,7 @@ void set_output_data(LevelData<FArrayBox> &a_grchombo_vars,
 
             // GRChombo conformal factor chi = psi^-4
             Real psi_bl = get_psi_brill_lindquist(loc, a_params);
-            Real chi = pow(multigrid_vars_box(iv, c_psi_reg) + psi_bl, -4.0);
+            Real chi = pow(multigrid_vars_box(iv, c_psi_reg), -4.0);
             grchombo_vars_box(iv, c_chi) = chi;
             Real factor = pow(chi, 1.5);
 

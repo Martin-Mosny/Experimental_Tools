@@ -75,6 +75,7 @@ int set_grids(Vector<DisjointBoxLayout> &vectGrids, PoissonParameters &a_params)
 
         int baseLevel = 0;
         int oldTopLevel = topLevel;
+        pout() << "The topLevel is " << topLevel << endl;
 
         // now initialize RHS for this existing hierarchy
         for (int level = 0; level <= topLevel; level++)
@@ -139,9 +140,12 @@ int set_grids(Vector<DisjointBoxLayout> &vectGrids, PoissonParameters &a_params)
                 new LevelData<FArrayBox>(vectGrids[lev], 1, IntVect::Zero);
         } // end loop over levels for initialization
 
+
+
         // figure out whether we need another pass through grid generation
         if ((topLevel < maxLevel) && (topLevel > oldTopLevel))
             moreLevels = true;
+
 
     } // end while moreLevels loop
 

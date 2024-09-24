@@ -44,7 +44,7 @@ enum
     c_B3,
 
     c_phi, // matter field added
-    c_Pi,  //(minus) conjugate momentum
+    c_pi,  //(minus) conjugate momentum
 
     c_Ham,
 
@@ -76,7 +76,7 @@ static constexpr char const *variable_names[NUM_GRCHOMBO_VARS] = {
 
     "B1",     "B2",     "B3",
 
-    "phi",    "Pi",
+    "phi",    "pi",
 
     "Ham",    "Mom1",   "Mom2",   "Mom3"};
 }

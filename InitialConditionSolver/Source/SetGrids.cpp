@@ -201,7 +201,6 @@ void set_tag_cells(Vector<LevelData<FArrayBox> *> &vectRHS,
         Real maxRHS = 0;
 
         maxRHS = norm(levelRhs, levelRhs.interval(), 0);
-
         Real tagVal = maxRHS * refine_thresh;
 
         // now loop through grids and tag cells where RHS > tagVal
@@ -223,6 +222,6 @@ void set_tag_cells(Vector<LevelData<FArrayBox> *> &vectRHS,
         local_tags &= domainBox;
 
         tagVect[lev] = local_tags;
-
+        pout() << "set_tag_cells is done." << endl;
     } // end loop over levels
 }

@@ -16,9 +16,9 @@ beta  = -1.0
 L = 100.0
 N = 64 64 64
 # number of AMR refinement levels is max_level + 1
-max_level    = 3
+max_level    = 1
 # Threshold for AMR refinement, based on magnitude of rhs
-refine_threshold = 1
+refine_threshold = 0.8
 #min box size
 block_factor = 8
 #max box size
@@ -36,7 +36,7 @@ max_iterations = 100 #max number of solver iterations
 max_NL_iterations = 6 #non linear outside loop iterations
 tolerance  = 1.0e-10  #solver tolerance for declaring convergence
 hang       = 1.0e-11  #solver tolerance for deciding when we're hung
-verbosity = 2 # higher number means more verbose output
+verbosity = 1 # higher number means more verbose output
 
 # how to average face-centered coefficients to coarser multigrid levels
 #coefficient_average_type = arithmetic
@@ -57,8 +57,8 @@ bc_value = 0.0
 G_Newton = 1.0 
 
 # scalar field input params
-phi_amplitude = 0.01
-phi_wavelength = 0.5
+phi_amplitude = 0.0001
+phi_wavelength = 2
 
 # initial conditions for Binary BH spacetimes
 # (can be with or without periodic BCs, 

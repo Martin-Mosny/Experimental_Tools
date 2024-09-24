@@ -13,6 +13,7 @@
 #include "CoarseAverage.H"
 #include "LoadBalance.H"
 #include "MyPhiFunction.H"
+#include "MyPiFunction.H"
 #include "PoissonParameters.H"
 #include "SetBinaryBH.H"
 #include "VariableCoeffPoissonOperatorFactory.H"
@@ -73,6 +74,11 @@ void set_initial_conditions(LevelData<FArrayBox> &a_multigrid_vars,
                 my_phi_function(loc, a_params.phi_amplitude,
                                 a_params.phi_wavelength, a_params.domainLength);
 
+            // set pi according to use defined function
+            multigrid_vars_box(iv, c_pi_0) =
+                my_pi_function(loc, a_params.phi_amplitude,
+                                a_params.phi_wavelength, a_params.domainLength);
+
             // set Aij for spin and momentum according to BH params
             set_binary_bh_Aij(multigrid_vars_box, iv, loc, a_params);
         }
@@ -127,9 +133,6 @@ void set_rhs(LevelData<FArrayBox> &a_rhs,
              LevelData<FArrayBox> &a_multigrid_vars, const RealVect &a_dx,
              const PoissonParameters &a_params, const Real constant_K)
 {
-    Real massless_BH;
-    if (a_params.bh1_bare_mass == 0) {massless_BH = 0;} else {massless_BH = 1;}
-
     CH_assert(a_multigrid_vars.nComp() == NUM_MULTIGRID_VARS);
 
     DataIterator dit = a_rhs.dataIterator();
@@ -165,12 +168,14 @@ void set_rhs(LevelData<FArrayBox> &a_rhs,
                  2 * pow(multigrid_vars_box(iv, c_A13_0), 2.0) +
                  2 * pow(multigrid_vars_box(iv, c_A23_0), 2.0);
 
-            Real psi_bl = massless_BH*get_psi_brill_lindquist(loc, a_params);
+            Real psi_bl = get_psi_brill_lindquist(loc, a_params);
             Real psi_0 =  multigrid_vars_box(iv, c_psi_reg) + psi_bl;
+            Real Pi_field = multigrid_vars_box(iv, c_pi_0);
 
             rhs_box(iv, 0) =  0.125 * m * pow(psi_0, 5.0) -
                               //0.125 * A2 * pow(psi_0, -7.0) -
                               M_PI * a_params.G_Newton * grad_phi_sq * psi_0 -
+                              M_PI * a_params.G_Newton * pow(Pi_field, 2.0) * pow(psi_0, -1.0) -
                               laplacian_of_psi;
         }
     }
@@ -221,10 +226,12 @@ void set_constant_K_integrand(LevelData<FArrayBox> &a_integrand,
 
             Real psi_bl = get_psi_brill_lindquist(loc, a_params);
             Real psi_0 = multigrid_vars_box(iv, c_psi_reg) + psi_bl;
+            Real Pi_field = multigrid_vars_box(iv, c_pi_0);
 
             integrand_box(iv, 0) = -1.5 * m + //1.5 * A2 * pow(psi_0, -12.0) +
                                    12.0 * M_PI * a_params.G_Newton *
                                        grad_phi_sq * pow(psi_0, -4.0) +
+                                   12.0 * M_PI * a_params.G_Newton * pow(Pi_field, 2.0) * pow(psi_0, -6) +
                                    12.0 * laplacian_of_psi * pow(psi_0, -5.0);
         }
     }
@@ -273,9 +280,12 @@ void set_regrid_condition(LevelData<FArrayBox> &a_condition,
             // value of the contributions and add in BH criteria
             Real psi_bl = get_psi_brill_lindquist(loc, a_params);
             Real psi_0 = multigrid_vars_box(iv, c_psi_reg) + psi_bl;
+            Real Pi_field = multigrid_vars_box(iv, c_pi_0);
+
             condition_box(iv, 0) = 1.5 * abs(m) + //1.5 * A2 * pow(psi_0, -7.0) +
                                    12.0 * M_PI * a_params.G_Newton *
                                        abs(grad_phi_sq) * pow(psi_0, 1.0) +
+                                   M_PI * a_params.G_Newton * pow(psi_0, -1.0) * pow(Pi_field, 2.0) +
                                    log(psi_0);
         }
     }
@@ -315,9 +325,8 @@ inline Real get_m(const Real &phi_here, const PoissonParameters &a_params,
     // KC TODO:
     // For now rho is just the gradient term which is kept separate
     // ... may want to add V(phi) and phidot/Pi here later though
-    Real Pi_field = 0.0;
     Real V_of_phi = 0.0;
-    Real rho = 0.5 * Pi_field * Pi_field + V_of_phi;
+    Real rho = V_of_phi;
 
     return (2.0 / 3.0) * (constant_K * constant_K) -
            16.0 * M_PI * a_params.G_Newton * rho;
@@ -363,9 +372,12 @@ void set_a_coef(LevelData<FArrayBox> &a_aCoef,
 
             Real psi_bl = get_psi_brill_lindquist(loc, a_params);
             Real psi_0 = multigrid_vars_box(iv, c_psi_reg) + psi_bl;
+            Real Pi_field = multigrid_vars_box(iv, c_pi_0);
+
             aCoef_box(iv, 0) = -0.625 * m * pow(psi_0, 4.0)
                                //- 0.875 * A2 * pow(psi_0, -8.0)
-                               +M_PI * a_params.G_Newton * grad_phi_sq;
+                               + M_PI * a_params.G_Newton * grad_phi_sq
+                               - M_PI * a_params.G_Newton * pow(psi_0, -2.0) * pow(Pi_field, 2.0);
         }
     }
 }
@@ -434,9 +446,10 @@ void set_output_data(LevelData<FArrayBox> &a_grchombo_vars,
             grchombo_vars_box(iv, c_chi) = chi;
             Real factor = pow(chi, 1.5);
 
-            // Copy phi and Aij across - note this is now \tilde Aij not \bar
+            // Copy phi, pi, and Aij across - note this is now \tilde Aij not \bar
             // Aij
             grchombo_vars_box(iv, c_phi) = multigrid_vars_box(iv, c_phi_0);
+            grchombo_vars_box(iv, c_pi) = multigrid_vars_box(iv, c_pi_0);
             grchombo_vars_box(iv, c_A11) =
                 multigrid_vars_box(iv, c_A11_0) * factor;
             grchombo_vars_box(iv, c_A12) =

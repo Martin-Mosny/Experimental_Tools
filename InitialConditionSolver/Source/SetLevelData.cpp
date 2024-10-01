@@ -20,6 +20,7 @@
 #include "computeNorm.H"
 #include "parstream.H"
 #include <cmath>
+#include <random>
 
 // Set various LevelData functions across the grid
 
@@ -31,6 +32,88 @@ inline void get_loc(RealVect &a_out_loc, const IntVect &a_iv,
     a_out_loc *= a_dx;
     a_out_loc -= a_params.domainLength / 2.0;
 }
+
+// Create pi as having variations of a Gaussian random field.
+void set_Gaussian_pi(Vector<LevelData<FArrayBox> *> &multigrid_vars,
+                    const PoissonParameters &a_params)
+{
+    // Initialize FFTW objects and create the in and out arrays along with the plan
+    fftw_complex *in;
+    double *out;
+    fftw_plan plan;
+    int n1 = a_params.nCells[0] * pow(2, a_params.maxLevel);
+    int n2 = a_params.nCells[0] * pow(2, a_params.maxLevel);
+    int n3 = a_params.nCells[0] * pow(2, a_params.maxLevel);
+
+    in = (fftw_complex*) fftw_malloc(n1 * n2 * n3 * sizeof(fftw_complex));
+    out = (double*) fftw_malloc( n1 * n2 * n3);
+    plan = fftw_plan_dft_c2r_3d(n1, n2, n3, in, out, 1);
+
+    // Set up the random number generator
+    std::default_random_engine generator;
+    std::uniform_real_distribution<double> distribution(0.0, 1.0);
+
+    // Calculate the momentum space random field
+    // Declare some variables to be used later
+    double phase;
+    double amplitude;
+    fftw_complex delta;
+    int p;
+    for (int i1 = 0; i1 < n1/2; i1++){
+        for (int i2 = 0; i2 < n2/2; i2++){
+            for (int i3 = 0; i3 < n3/2; i3++){
+                
+                // Calculate the random Rayleight distribution and phase and assign delta
+                phase = 2 * M_PI * distribution(generator);
+                amplitude = sqrt(-log(distribution(generator)) * a_params.Gaussian_amplitude);
+                delta[0] = amplitude * cos(phase);
+                delta[1] = amplitude * sin(phase);
+
+                // Assign momenta
+                p = i3 + n3 * (i2 + n2 * i1);
+                in[p][0] = delta[0];
+                in[p][1] = delta[1];
+
+                // Assign conjugate momenta
+                p = n1 * n2 * n3 -1 
+                   - i3 - n3 * (i2 + n2 * i1);
+                in[p][0] = delta[0];
+                in[p][1] = - delta[1];
+            }
+        }
+    }
+
+    // Run the plan:
+    // fftw_execute(plan);
+    
+    int nlevels = a_params.numLevels;
+    // Print the random Gaussian field into the phi field.
+    for (int ilev = 0; ilev < nlevels; ilev++)
+    {
+        LevelData<FArrayBox> *Fields = multigrid_vars[ilev];
+
+        DataIterator dit = Fields -> dataIterator();
+        for (dit.begin(); dit.ok(); ++dit)
+        {
+            FArrayBox& Fields_box = (*Fields)[dit()];
+            Box b = Fields_box.box();
+            BoxIterator bit(b);
+            for (bit.begin(); bit.ok(); ++bit)
+            {
+                IntVect iv = bit();
+                p = (iv[2] + n3 * (iv[1] + n2 * iv[0])) / pow(2, a_params.maxLevel - ilev);
+                Fields_box(iv, c_pi_0) = out[p];
+            }
+        }
+    }
+
+    fftw_destroy_plan(plan);
+    fftw_free(in);
+    fftw_free(out);
+}
+
+
+
 
 // set initial guess value for the conformal factor psi
 // defined by \gamma_ij = \psi^4 \tilde \gamma_ij, scalar field phi
@@ -73,17 +156,32 @@ void set_initial_conditions(LevelData<FArrayBox> &a_multigrid_vars,
             multigrid_vars_box(iv, c_phi_0) =
                 my_phi_function(loc, a_params.phi_amplitude,
                                 a_params.phi_wavelength, a_params.domainLength);
-
-            // set pi according to use defined function
-            multigrid_vars_box(iv, c_pi_0) =
-                my_pi_function(loc, a_params.phi_amplitude,
-                                a_params.phi_wavelength, a_params.domainLength);
+            
+            // set pi function as Gaussian or specific function
+            if (a_params.Gaussian_init == 1)
+            {
+                // Here I need to create a function that does this task.
+                // multigrid_vars_box(iv, c_pi_0) = 
+                // my_pi_Gaussian_function(loc, a_params.Gaussian_amplitude, a_params.domainLength);
+                multigrid_vars_box(iv, c_pi_0) =
+                    my_pi_function(loc, a_params.phi_amplitude,
+                                    a_params.phi_wavelength, a_params.domainLength);
+            }
+            else
+            {
+                // set pi according to use defined function
+                multigrid_vars_box(iv, c_pi_0) =
+                    my_pi_function(loc, a_params.phi_amplitude,
+                                    a_params.phi_wavelength, a_params.domainLength);
+            }
 
             // set Aij for spin and momentum according to BH params
             set_binary_bh_Aij(multigrid_vars_box, iv, loc, a_params);
         }
     }
 } // end set_initial_conditions
+
+
 
 // computes the Laplacian of psi at a point in a box
 inline Real get_laplacian_psi(const IntVect &a_iv, const FArrayBox &a_psi_fab,

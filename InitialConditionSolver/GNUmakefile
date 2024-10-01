@@ -5,6 +5,8 @@ ifndef CHOMBO_HOME
     $(error Please define CHOMBO_HOME - see installation instructions.)
 endif
 
+LDFLAGS = -lfftw3 -lm
+
 # trace the chain of included makefiles
 makefiles += releasedExamples_AMRPoisson_execVariableCoefficient
 
@@ -14,7 +16,7 @@ makefiles += releasedExamples_AMRPoisson_execVariableCoefficient
 ebase = Main_PoissonSolver
 
 # names of Chombo libraries needed by this program, in order of search.
-LibNames = AMRElliptic AMRTools BoxTools
+LibNames = AMRElliptic AMRTools BoxTools 
 
 # the locations of the source code directories
 base_dir = .

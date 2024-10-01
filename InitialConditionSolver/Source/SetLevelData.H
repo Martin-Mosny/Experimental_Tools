@@ -18,12 +18,16 @@ using std::cerr;
 #include "PoissonParameters.H"
 #include "VariableCoeffPoissonOperator.H"
 #include "VariableCoeffPoissonOperatorFactory.H"
+#include <fftw3.h>
 
 // various functions operating on grids to set up data for initial
 // conditions, spatially dependent coefficients and rhs etc
 
 inline void get_loc(RealVect &a_out_loc, const IntVect &a_iv,
                     const RealVect &a_dx, const PoissonParameters &a_params);
+
+extern void set_Gaussian_pi(LevelData<FArrayBox> &a_multigrid_vars, 
+                            const PoissonParameters &a_params);
 
 extern void set_initial_conditions(LevelData<FArrayBox> &a_multigrid_vars,
                                    LevelData<FArrayBox> &a_dpsi,

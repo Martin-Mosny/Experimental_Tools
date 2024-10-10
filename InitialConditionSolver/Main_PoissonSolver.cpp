@@ -92,7 +92,7 @@ int poissonSolve(const Vector<DisjointBoxLayout> &a_grids,
         vectDomains[ilev] = domLev;
         vectDx[ilev] = dxLev;
         // set initial guess for psi and zero dpsi
-        // and values for other multigrid sources - phi and Aij
+        // and values for other multigrid sources - phi and Aij, but not pi
         set_initial_conditions(*multigrid_vars[ilev], *dpsi[ilev], vectDx[ilev],
                                a_params);
 
@@ -100,6 +100,11 @@ int poissonSolve(const Vector<DisjointBoxLayout> &a_grids,
         dxLev /= a_params.refRatio[ilev];
         domLev.refine(a_params.refRatio[ilev]);
     }
+
+    // Create Gaussian initial conditions
+    pout() << "HELLO" << endl;
+    set_Gaussian_pi(multigrid_vars, a_params);
+    pout() << "END" << endl;
 
     // set up linear operator
     int lBase = 0;

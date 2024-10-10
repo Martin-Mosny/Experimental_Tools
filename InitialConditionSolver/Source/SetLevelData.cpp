@@ -21,6 +21,7 @@
 #include "parstream.H"
 #include <cmath>
 #include <random>
+#include <chrono>
 
 // Set various LevelData functions across the grid
 
@@ -42,15 +43,18 @@ void set_Gaussian_pi(Vector<LevelData<FArrayBox> *> &multigrid_vars,
     double *out;
     fftw_plan plan;
     int n1 = a_params.nCells[0] * pow(2, a_params.maxLevel);
-    int n2 = a_params.nCells[0] * pow(2, a_params.maxLevel);
-    int n3 = a_params.nCells[0] * pow(2, a_params.maxLevel);
-
-    in = (fftw_complex*) fftw_malloc(n1 * n2 * n3 * sizeof(fftw_complex));
-    out = (double*) fftw_malloc( n1 * n2 * n3);
-    plan = fftw_plan_dft_c2r_3d(n1, n2, n3, in, out, 1);
+    int n2 = a_params.nCells[1] * pow(2, a_params.maxLevel);
+    int n3 = a_params.nCells[2] * pow(2, a_params.maxLevel);
+    pout() << n1 << " " << n2 << " " << n3 << endl;
+    in = (fftw_complex*) fftw_malloc(n1 * n2 * (n3 / 2 + 1) * sizeof(fftw_complex));
+    out = (double*) fftw_malloc( n1 * n2 * n3 * sizeof(double));
+    plan = fftw_plan_dft_c2r_3d(n1, n2, n3, in, out, FFTW_ESTIMATE);
 
     // Set up the random number generator
     std::default_random_engine generator;
+    std::random_device rand_device;
+    //double random_seed = rand_device(); // Using this actively is problematic.
+    generator.seed(6);
     std::uniform_real_distribution<double> distribution(0.0, 1.0);
 
     // Calculate the momentum space random field
@@ -58,38 +62,46 @@ void set_Gaussian_pi(Vector<LevelData<FArrayBox> *> &multigrid_vars,
     double phase;
     double amplitude;
     fftw_complex delta;
-    int p;
-    for (int i1 = 0; i1 < n1/2; i1++){
-        for (int i2 = 0; i2 < n2/2; i2++){
-            for (int i3 = 0; i3 < n3/2; i3++){
+    int p1 = 0;
+    int p2 = 0;
+    double q = 0;
+    int is_img = 1;
+    for (int i1 = -n1/2; i1 < n1/2; i1++){
+        for (int i2 = -n2/2; i2 < n2/2; i2++){
+            for (int i3 = 0; i3 < (n3/2 + 1); i3++){
                 
                 // Calculate the random Rayleight distribution and phase and assign delta
+                q = sqrt(pow(i1, 2) + pow(i2, 2) + pow(i3, 2));
                 phase = 2 * M_PI * distribution(generator);
-                amplitude = sqrt(-log(distribution(generator)) * a_params.Gaussian_amplitude);
+                amplitude = sqrt(-log(distribution(generator))/(pow(q, 3) + 0.01) * a_params.Gaussian_amplitude);
                 delta[0] = amplitude * cos(phase);
                 delta[1] = amplitude * sin(phase);
 
                 // Assign momenta
-                p = i3 + n3 * (i2 + n2 * i1);
-                in[p][0] = delta[0];
-                in[p][1] = delta[1];
-
-                // Assign conjugate momenta
-                p = n1 * n2 * n3 -1 
-                   - i3 - n3 * (i2 + n2 * i1);
-                in[p][0] = delta[0];
-                in[p][1] = - delta[1];
+                p1 = i3 + (n3 / 2 + 1) * (((i2) % (n2) + n2) % (n2) + n2* (((i1) % (n1) + n1) % (n1))); 
+                
+                in[p1][0] = delta[0];
+                in[p1][1] = delta[1];
             }
         }
     }
-
+    
     // Run the plan:
-    // fftw_execute(plan);
+    fftw_execute(plan);
     
     int nlevels = a_params.numLevels;
+    int n1_lev;
+    int n2_lev;
+    int n3_lev;
+    int iv0;
+    int iv1;
+    int iv2;
     // Print the random Gaussian field into the phi field.
     for (int ilev = 0; ilev < nlevels; ilev++)
     {
+        n1_lev = n1 / pow(2, a_params.maxLevel - ilev);
+        n2_lev = n2 / pow(2, a_params.maxLevel - ilev);
+        n3_lev = n3 / pow(2, a_params.maxLevel - ilev);
         LevelData<FArrayBox> *Fields = multigrid_vars[ilev];
 
         DataIterator dit = Fields -> dataIterator();
@@ -101,8 +113,11 @@ void set_Gaussian_pi(Vector<LevelData<FArrayBox> *> &multigrid_vars,
             for (bit.begin(); bit.ok(); ++bit)
             {
                 IntVect iv = bit();
-                p = (iv[2] + n3 * (iv[1] + n2 * iv[0])) / pow(2, a_params.maxLevel - ilev);
-                Fields_box(iv, c_pi_0) = out[p];
+                iv0 = iv[0] * pow(2, a_params.maxLevel - ilev);
+                iv1 = iv[1] * pow(2, a_params.maxLevel - ilev);
+                iv2 = iv[2] * pow(2, a_params.maxLevel - ilev);
+                p1 = ((iv2 % n3_lev + n3_lev) % n3_lev) + n3 * (((iv1 % n2_lev + n2_lev) % n2_lev) + n2 * ((iv0 % n1_lev + n1_lev) % n1_lev));
+                Fields_box(iv, c_pi_0) = out[p1];
             }
         }
     }
@@ -157,23 +172,13 @@ void set_initial_conditions(LevelData<FArrayBox> &a_multigrid_vars,
                 my_phi_function(loc, a_params.phi_amplitude,
                                 a_params.phi_wavelength, a_params.domainLength);
             
-            // set pi function as Gaussian or specific function
-            if (a_params.Gaussian_init == 1)
-            {
-                // Here I need to create a function that does this task.
-                // multigrid_vars_box(iv, c_pi_0) = 
-                // my_pi_Gaussian_function(loc, a_params.Gaussian_amplitude, a_params.domainLength);
-                multigrid_vars_box(iv, c_pi_0) =
-                    my_pi_function(loc, a_params.phi_amplitude,
-                                    a_params.phi_wavelength, a_params.domainLength);
-            }
-            else
-            {
-                // set pi according to use defined function
-                multigrid_vars_box(iv, c_pi_0) =
-                    my_pi_function(loc, a_params.phi_amplitude,
-                                    a_params.phi_wavelength, a_params.domainLength);
-            }
+            
+            // set pi according to use defined function
+            /*
+            multigrid_vars_box(iv, c_pi_0) =
+                my_pi_function(loc, a_params.phi_amplitude,
+                                a_params.phi_wavelength, a_params.domainLength);
+            */            
 
             // set Aij for spin and momentum according to BH params
             set_binary_bh_Aij(multigrid_vars_box, iv, loc, a_params);

@@ -75,7 +75,6 @@ int set_grids(Vector<DisjointBoxLayout> &vectGrids, PoissonParameters &a_params)
 
         int baseLevel = 0;
         int oldTopLevel = topLevel;
-        pout() << "The topLevel is " << topLevel << endl;
 
         // now initialize RHS for this existing hierarchy
         for (int level = 0; level <= topLevel; level++)
@@ -222,6 +221,5 @@ void set_tag_cells(Vector<LevelData<FArrayBox> *> &vectRHS,
         local_tags &= domainBox;
 
         tagVect[lev] = local_tags;
-        pout() << "set_tag_cells is done." << endl;
     } // end loop over levels
 }

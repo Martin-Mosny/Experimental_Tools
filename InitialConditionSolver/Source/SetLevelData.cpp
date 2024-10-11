@@ -22,6 +22,7 @@
 #include <cmath>
 #include <random>
 #include <chrono>
+#include <vector>
 
 // Set various LevelData functions across the grid
 
@@ -34,7 +35,7 @@ inline void get_loc(RealVect &a_out_loc, const IntVect &a_iv,
     a_out_loc -= a_params.domainLength / 2.0;
 }
 
-// Create pi as having variations of a Gaussian random field.
+// Create the perturbations in pi to be a Gaussian random field.
 void set_Gaussian_pi(Vector<LevelData<FArrayBox> *> &multigrid_vars,
                     const PoissonParameters &a_params)
 {
@@ -45,15 +46,12 @@ void set_Gaussian_pi(Vector<LevelData<FArrayBox> *> &multigrid_vars,
     int n1 = a_params.nCells[0] * pow(2, a_params.maxLevel);
     int n2 = a_params.nCells[1] * pow(2, a_params.maxLevel);
     int n3 = a_params.nCells[2] * pow(2, a_params.maxLevel);
-    pout() << n1 << " " << n2 << " " << n3 << endl;
     in = (fftw_complex*) fftw_malloc(n1 * n2 * (n3 / 2 + 1) * sizeof(fftw_complex));
     out = (double*) fftw_malloc( n1 * n2 * n3 * sizeof(double));
     plan = fftw_plan_dft_c2r_3d(n1, n2, n3, in, out, FFTW_ESTIMATE);
 
     // Set up the random number generator
     std::default_random_engine generator;
-    std::random_device rand_device;
-    //double random_seed = rand_device(); // Using this actively is problematic.
     generator.seed(6);
     std::uniform_real_distribution<double> distribution(0.0, 1.0);
 
@@ -62,42 +60,53 @@ void set_Gaussian_pi(Vector<LevelData<FArrayBox> *> &multigrid_vars,
     double phase;
     double amplitude;
     fftw_complex delta;
-    int p1 = 0;
-    int p2 = 0;
+    int p = 0;
     double q = 0;
-    int is_img = 1;
     for (int i1 = -n1/2; i1 < n1/2; i1++){
         for (int i2 = -n2/2; i2 < n2/2; i2++){
             for (int i3 = 0; i3 < (n3/2 + 1); i3++){
                 
                 // Calculate the random Rayleight distribution and phase and assign delta
+                // The inverse power of q affects the scale of the Gaussian random field corrrelation
                 q = sqrt(pow(i1, 2) + pow(i2, 2) + pow(i3, 2));
                 phase = 2 * M_PI * distribution(generator);
-                amplitude = sqrt(-log(distribution(generator))/(pow(q, 3) + 0.01) * a_params.Gaussian_amplitude);
+                amplitude = sqrt(-log(distribution(generator))/(pow(q, 3) + 0.1) * a_params.Gaussian_amplitude);
                 delta[0] = amplitude * cos(phase);
                 delta[1] = amplitude * sin(phase);
 
-                // Assign momenta
-                p1 = i3 + (n3 / 2 + 1) * (((i2) % (n2) + n2) % (n2) + n2* (((i1) % (n1) + n1) % (n1))); 
-                
-                in[p1][0] = delta[0];
-                in[p1][1] = delta[1];
+                // Assign values
+                p = i3 + (n3 / 2 + 1) * (((i2) % (n2) + n2) % (n2) + n2* (((i1) % (n1) + n1) % (n1))); 
+                in[p][0] = delta[0];
+                in[p][1] = delta[1];
             }
         }
+    }
+
+    // Now we got to go back and make real the entries that are at points where k = - k mod n
+    // For that we define a vector with all the relevant coordinates and another with the relevant q radius 
+    std::vector<std::vector<int>> conjugate_vectors({{0, 0, 0}, {n1 / 2, 0 , 0}, {0, n2 / 2, 0}, 
+                        {0, 0, n3 / 2}, {n1 / 2, n2 / 2, 0}, {n1 / 2, 0, n3 / 2},
+                        {0, n2 / 2, n3 / 2}, {n1 / 2, n2 / 2, n3 / 2}});
+    std::vector<double> q_vector({0, n1 / 2.0, n2 / 2.0, n3 / 2.0, sqrt(pow(n1, 2) + pow(n2, 2)) / 2.0, 
+                            sqrt(pow(n1, 2) + pow(n3, 2)) / 2.0, sqrt(pow(n2, 2) + pow(n3, 2)) / 2.0,
+                            sqrt(pow(n1, 2) + pow(n2, 2) + pow(n3, 2)) / 2.0});
+
+    // Here we then run through these to reassign the real part and set the imaginary part to zero.
+    int i;
+    for (i = 0; i < 8; i++){
+        p = conjugate_vectors[i][2] + n3 * (conjugate_vectors[i][1] + n2 * conjugate_vectors[i][0]);
+        in[p][0] = sqrt(-log(distribution(generator)) / (pow(q_vector[i], 3) + 0.1) * a_params.Gaussian_amplitude);
+        in[p][1] = 0;
     }
     
     // Run the plan:
     fftw_execute(plan);
     
-    int nlevels = a_params.numLevels;
     int n1_lev;
     int n2_lev;
     int n3_lev;
-    int iv0;
-    int iv1;
-    int iv2;
-    // Print the random Gaussian field into the phi field.
-    for (int ilev = 0; ilev < nlevels; ilev++)
+    // Print the random Gaussian field into the pi field.
+    for (int ilev = 0; ilev < a_params.numLevels; ilev++)
     {
         n1_lev = n1 / pow(2, a_params.maxLevel - ilev);
         n2_lev = n2 / pow(2, a_params.maxLevel - ilev);
@@ -112,12 +121,12 @@ void set_Gaussian_pi(Vector<LevelData<FArrayBox> *> &multigrid_vars,
             BoxIterator bit(b);
             for (bit.begin(); bit.ok(); ++bit)
             {
+                // Must take the modular coordinate to assign ghost values correctly
                 IntVect iv = bit();
-                iv0 = iv[0] * pow(2, a_params.maxLevel - ilev);
-                iv1 = iv[1] * pow(2, a_params.maxLevel - ilev);
-                iv2 = iv[2] * pow(2, a_params.maxLevel - ilev);
-                p1 = ((iv2 % n3_lev + n3_lev) % n3_lev) + n3 * (((iv1 % n2_lev + n2_lev) % n2_lev) + n2 * ((iv0 % n1_lev + n1_lev) % n1_lev));
-                Fields_box(iv, c_pi_0) = out[p1];
+                p = (((int)(iv[2] * pow(2, a_params.maxLevel - ilev)) % n3_lev + n3_lev) % n3_lev) 
+                  + n3 * ((((int)(iv[1] * pow(2, a_params.maxLevel - ilev)) % n2_lev + n2_lev) % n2_lev) 
+                  + n2 * (((int)(iv[0] * pow(2, a_params.maxLevel - ilev)) % n1_lev + n1_lev) % n1_lev));
+                Fields_box(iv, c_pi_0) = a_params.Gaussian_init + out[p];
             }
         }
     }

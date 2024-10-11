@@ -59,8 +59,8 @@ G_Newton = 1.0
 # scalar field input params
 phi_amplitude = 0.0001
 phi_wavelength = 2
-Gaussian_init  = 1
-Gaussian_amplitude = 0.001
+Gaussian_init  = 2
+Gaussian_amplitude = 0.00001
 
 # initial conditions for Binary BH spacetimes
 # (can be with or without periodic BCs, 

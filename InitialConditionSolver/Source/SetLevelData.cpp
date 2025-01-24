@@ -70,7 +70,7 @@ void set_Gaussian_pi(Vector<LevelData<FArrayBox> *> &multigrid_vars,
                 // The inverse power of q affects the scale of the Gaussian random field corrrelation
                 q = sqrt(pow(i1, 2) + pow(i2, 2) + pow(i3, 2));
                 phase = 2 * M_PI * distribution(generator);
-                amplitude = sqrt(-log(distribution(generator))/(pow(q, 3) + 0.1) * a_params.Gaussian_amplitude);
+                amplitude = sqrt(-log(distribution(generator))/(pow(q, 4) + 0.1) * a_params.Gaussian_amplitude);
                 delta[0] = amplitude * cos(phase);
                 delta[1] = amplitude * sin(phase);
 
@@ -126,7 +126,7 @@ void set_Gaussian_pi(Vector<LevelData<FArrayBox> *> &multigrid_vars,
                 p = (((int)(iv[2] * pow(2, a_params.maxLevel - ilev)) % n3_lev + n3_lev) % n3_lev) 
                   + n3 * ((((int)(iv[1] * pow(2, a_params.maxLevel - ilev)) % n2_lev + n2_lev) % n2_lev) 
                   + n2 * (((int)(iv[0] * pow(2, a_params.maxLevel - ilev)) % n1_lev + n1_lev) % n1_lev));
-                Fields_box(iv, c_pi_0) = a_params.Gaussian_init + out[p];
+                Fields_box(iv, c_Pi_0) = a_params.Gaussian_init + out[p];
             }
         }
     }
@@ -183,11 +183,11 @@ void set_initial_conditions(LevelData<FArrayBox> &a_multigrid_vars,
             
             
             // set pi according to use defined function
-            /*
-            multigrid_vars_box(iv, c_pi_0) =
+            #ifndef GAUSSIAN_INIT
+            multigrid_vars_box(iv, c_Pi_0) =
                 my_pi_function(loc, a_params.phi_amplitude,
                                 a_params.phi_wavelength, a_params.domainLength);
-            */            
+            #endif
 
             // set Aij for spin and momentum according to BH params
             set_binary_bh_Aij(multigrid_vars_box, iv, loc, a_params);
@@ -282,7 +282,7 @@ void set_rhs(LevelData<FArrayBox> &a_rhs,
 
             Real psi_bl = get_psi_brill_lindquist(loc, a_params);
             Real psi_0 =  multigrid_vars_box(iv, c_psi_reg) + psi_bl;
-            Real Pi_field = multigrid_vars_box(iv, c_pi_0);
+            Real Pi_field = multigrid_vars_box(iv, c_Pi_0);
 
             rhs_box(iv, 0) =  0.125 * m * pow(psi_0, 5.0) -
                               //0.125 * A2 * pow(psi_0, -7.0) -
@@ -338,7 +338,7 @@ void set_constant_K_integrand(LevelData<FArrayBox> &a_integrand,
 
             Real psi_bl = get_psi_brill_lindquist(loc, a_params);
             Real psi_0 = multigrid_vars_box(iv, c_psi_reg) + psi_bl;
-            Real Pi_field = multigrid_vars_box(iv, c_pi_0);
+            Real Pi_field = multigrid_vars_box(iv, c_Pi_0);
 
             integrand_box(iv, 0) = -1.5 * m + //1.5 * A2 * pow(psi_0, -12.0) +
                                    12.0 * M_PI * a_params.G_Newton *
@@ -392,7 +392,7 @@ void set_regrid_condition(LevelData<FArrayBox> &a_condition,
             // value of the contributions and add in BH criteria
             Real psi_bl = get_psi_brill_lindquist(loc, a_params);
             Real psi_0 = multigrid_vars_box(iv, c_psi_reg) + psi_bl;
-            Real Pi_field = multigrid_vars_box(iv, c_pi_0);
+            Real Pi_field = multigrid_vars_box(iv, c_Pi_0);
 
             condition_box(iv, 0) = 1.5 * abs(m) + //1.5 * A2 * pow(psi_0, -7.0) +
                                    12.0 * M_PI * a_params.G_Newton *
@@ -484,7 +484,7 @@ void set_a_coef(LevelData<FArrayBox> &a_aCoef,
 
             Real psi_bl = get_psi_brill_lindquist(loc, a_params);
             Real psi_0 = multigrid_vars_box(iv, c_psi_reg) + psi_bl;
-            Real Pi_field = multigrid_vars_box(iv, c_pi_0);
+            Real Pi_field = multigrid_vars_box(iv, c_Pi_0);
 
             aCoef_box(iv, 0) = -0.625 * m * pow(psi_0, 4.0)
                                //- 0.875 * A2 * pow(psi_0, -8.0)
@@ -561,7 +561,7 @@ void set_output_data(LevelData<FArrayBox> &a_grchombo_vars,
             // Copy phi, pi, and Aij across - note this is now \tilde Aij not \bar
             // Aij
             grchombo_vars_box(iv, c_phi) = multigrid_vars_box(iv, c_phi_0);
-            grchombo_vars_box(iv, c_pi) = multigrid_vars_box(iv, c_pi_0);
+            grchombo_vars_box(iv, c_Pi) = multigrid_vars_box(iv, c_Pi_0);
             grchombo_vars_box(iv, c_A11) =
                 multigrid_vars_box(iv, c_A11_0) * factor;
             grchombo_vars_box(iv, c_A12) =
@@ -577,3 +577,124 @@ void set_output_data(LevelData<FArrayBox> &a_grchombo_vars,
         }
     }
 }
+
+void Hamiltonian_constraint(const Vector<DisjointBoxLayout> &grids, Vector<LevelData<FArrayBox> *> multigrid_vars, const Vector<RealVect> &a_dx,
+             const PoissonParameters &a_params, const Real constant_K)
+{   
+     for (int ilev = 0; ilev < a_params.numLevels; ilev++)
+        {
+            Real Ham_constraint = 0;
+            int Num = 0;
+            Real volume = pow(1.5625*32, 3);
+            LevelData<FArrayBox> *Fields = multigrid_vars[ilev];
+            //LevelData<FArrayBox> *rhs_level_data = rhs[ilev];
+            //DataIterator dit = Fields -> dataIterator();
+            DataIterator dit = grids[ilev].dataIterator();
+            for (dit.begin(); dit.ok(); ++dit)
+            {
+                FArrayBox& Fields_box = (*Fields)[dit()];
+                // FArrayBox& rhs_box = (*rhs_level_data)[dit()];
+                FArrayBox psi_fab(Interval(c_psi_reg, c_psi_reg), Fields_box);
+                const Box& b = grids[ilev][dit];
+                BoxIterator bit(b);
+                for (bit.begin(); bit.ok(); ++bit)
+                {
+                    // Must take the modular coordinate to assign ghost values correctly
+                    IntVect iv = bit();
+                    Real laplacian_value = get_laplacian_psi(iv, psi_fab, a_dx[ilev]);
+                    Num += 1;
+                    Ham_constraint += laplacian_value 
+                       - (pow(psi_fab(iv), 5) * pow(constant_K, 2) / 12.0 
+                       - M_PI * pow(Fields_box(iv, c_Pi_0), 2) * pow(psi_fab(iv), 5));
+                }
+            }
+
+            pout() << "The Hamiltonian constraint at level " << ilev << " is give by " << Ham_constraint / pow(1.5625*32, 3) << endl;
+        }
+}
+
+Vector<LevelData<FArrayBox> *> Ham_calc(const Vector<DisjointBoxLayout> &grids, Vector<LevelData<FArrayBox> *> multigrid_vars, const Vector<RealVect> &a_dx,
+             const PoissonParameters &a_params, const Real constant_K)
+{   
+    Vector<LevelData<FArrayBox> *> Ham(multigrid_vars.size(), NULL);
+
+    // Initialize the Hamiltonian constraint girds
+    for (int ilev = 0; ilev < a_params.numLevels; ilev++)
+    {
+        Ham[ilev] = new LevelData<FArrayBox>(grids[ilev], 1, IntVect::Zero);
+    }
+
+    // Fill in the Hamiltonian constraint
+    for (int ilev = 0; ilev < a_params.numLevels; ilev++)
+        {
+            LevelData<FArrayBox> *Fields = multigrid_vars[ilev];
+            LevelData<FArrayBox> *Ham_fields = Ham[ilev];
+            DataIterator dit = grids[ilev].dataIterator();
+            for (dit.begin(); dit.ok(); ++dit)
+            {
+                FArrayBox& Fields_box = (*Fields)[dit()];
+                FArrayBox& Ham_box = (*Ham_fields)[dit()];
+                FArrayBox psi_fab(Interval(c_psi_reg, c_psi_reg), Fields_box);
+                const Box& b = grids[ilev][dit];
+                BoxIterator bit(b);
+                for (bit.begin(); bit.ok(); ++bit)
+                {
+                    // Must take the modular coordinate to assign ghost values correctly
+                    IntVect iv = bit();
+                    Real laplacian_value = get_laplacian_psi(iv, psi_fab, a_dx[ilev]);
+                    Ham_box(iv) = laplacian_value 
+                       - (pow(psi_fab(iv), 5) * pow(constant_K, 2) / 12.0 
+                       - M_PI * pow(Fields_box(iv, c_Pi_0), 2) * pow(psi_fab(iv), 5));
+                }
+            }
+        }
+    return Ham;
+} // end set_rhs
+
+Vector<LevelData<FArrayBox> *> normalized_Ham_calc(const Vector<DisjointBoxLayout> &grids, Vector<LevelData<FArrayBox> *> multigrid_vars, const Vector<RealVect> &a_dx,
+             const PoissonParameters &a_params, const Real constant_K)
+{   
+    Vector<LevelData<FArrayBox> *> normalized_Ham(multigrid_vars.size(), NULL);
+
+    // Initialize the Hamiltonian constraint girds
+    for (int ilev = 0; ilev < a_params.numLevels; ilev++)
+    {
+        normalized_Ham[ilev] = new LevelData<FArrayBox>(grids[ilev], 1, IntVect::Zero);
+    }
+
+    // Fill in the Hamiltonian constraint
+    for (int ilev = 0; ilev < a_params.numLevels; ilev++)
+        {
+            LevelData<FArrayBox> *Fields = multigrid_vars[ilev];
+            LevelData<FArrayBox> *Ham_fields = normalized_Ham[ilev];
+            DataIterator dit = grids[ilev].dataIterator();
+            for (dit.begin(); dit.ok(); ++dit)
+            {
+                FArrayBox& Fields_box = (*Fields)[dit()];
+                FArrayBox& Ham_box = (*Ham_fields)[dit()];
+                FArrayBox psi_fab(Interval(c_psi_reg, c_psi_reg), Fields_box);
+                const Box& b = grids[ilev][dit];
+                BoxIterator bit(b);
+                for (bit.begin(); bit.ok(); ++bit)
+                {
+                    // Must take the modular coordinate to assign ghost values correctly
+                    IntVect iv = bit();
+                    Real laplacian_value = get_laplacian_psi(iv, psi_fab, a_dx[ilev]);
+                    Real Ham_value = laplacian_value 
+                       - (pow(psi_fab(iv), 5) * pow(constant_K, 2) / 12.0 
+                       - M_PI * pow(Fields_box(iv, c_Pi_0), 2) * pow(psi_fab(iv), 5));
+                    Real Ham_ref = sqrt(pow(laplacian_value, 2) 
+                      + pow((pow(psi_fab(iv), 5) * pow(constant_K, 2) / 12.0), 2)
+                      + pow(M_PI * pow(Fields_box(iv, c_Pi_0), 2) * pow(psi_fab(iv), 5), 2));
+                    
+                    Ham_box(iv) = Ham_value / Ham_ref; 
+                    // pout() << "value " << Ham_value << " and " << Ham_ref << endl;
+                    // pout() << "Laplacian " << laplacian_value << endl;
+                    // pout() << "Term 1:   " << pow(psi_fab(iv), 5) * pow(constant_K, 2) / 12.0  << endl;
+                    // pout() << "Term 2:   " << M_PI * pow(Fields_box(iv, c_Pi_0), 2) * pow(psi_fab(iv), 5) << endl;
+     
+                }
+            }
+        }
+    return normalized_Ham;
+} // end set_rhs

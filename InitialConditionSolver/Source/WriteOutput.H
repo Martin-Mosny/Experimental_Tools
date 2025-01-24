@@ -32,6 +32,8 @@
 #include "PoissonParameters.H"
 #include "SetLevelData.H"
 #include <iostream>
+#include "computeSum.H"
+
 
 #ifdef CH_Linux
 // Should be undefined by default
@@ -116,6 +118,84 @@ void output_solver_data(const Vector<LevelData<FArrayBox> *> &a_dpsi,
 #endif
 }
 
+// Here we correct the Pi to be physical.
+void Correct_Pi(const Vector<LevelData<FArrayBox> *> &multigrid_vars, const PoissonParameters &a_params)
+{
+    for (int ilev = 0; ilev < a_params.numLevels; ilev++)
+        {
+            LevelData<FArrayBox> *Fields = multigrid_vars[ilev];
+            DataIterator dit = Fields -> dataIterator();
+            for (dit.begin(); dit.ok(); ++dit)
+            {
+                FArrayBox& Fields_box = (*Fields)[dit()];
+                Box b = Fields_box.box();
+                BoxIterator bit(b);
+                for (bit.begin(); bit.ok(); ++bit)
+                {
+                    // Must take the modular coordinate to assign ghost values correctly
+                    IntVect iv = bit();
+                    Fields_box(iv, c_Pi_0) = Fields_box(iv, c_Pi_0) * pow(Fields_box(iv, c_psi_reg), -3);
+                }
+            }
+        }
+}
+/*
+inline Real get_laplacian_psi(const IntVect &a_iv, const FArrayBox &a_psi_fab,
+                              const RealVect &a_dx)
+{
+    Real laplacian_of_psi = 0.0;
+    for (int idir = 0; idir < SpaceDim; ++idir)
+    {
+        IntVect iv_offset1 = a_iv;
+        IntVect iv_offset2 = a_iv;
+        iv_offset1[idir] -= 1;
+        iv_offset2[idir] += 1;
+
+        pout() << a_psi_fab(a_iv, c_psi_reg) << endl;
+        pout() << a_psi_fab(iv_offset1, c_psi_reg) << endl;
+        pout() << a_psi_fab(iv_offset2, c_psi_reg) << endl;
+
+
+        // 2nd order stencil for now
+        Real d2psi_dxdx = 1.0 / (a_dx[idir] * a_dx[idir]) *
+                          (+1.0 * a_psi_fab(iv_offset2, c_psi_reg) -
+                           2.0 * a_psi_fab(a_iv, c_psi_reg) + 1.0 * a_psi_fab(iv_offset1, c_psi_reg));
+        laplacian_of_psi += d2psi_dxdx;
+    }
+    return laplacian_of_psi;
+} // end get_laplacian_psi
+
+void Hamiltonian_constraint(Vector<LevelData<FArrayBox> *> multigrid_vars, const Vector<RealVect> &a_dx,
+             const PoissonParameters &a_params, const Real constant_K)
+{
+
+     for (int ilev = 0; ilev < a_params.numLevels; ilev++)
+        {
+            Real Ham_constraint = 0;
+            LevelData<FArrayBox> *Fields = multigrid_vars[ilev];
+            DataIterator dit = Fields -> dataIterator();
+            for (dit.begin(); dit.ok(); ++dit)
+            {
+                FArrayBox& Fields_box = (*Fields)[dit()];
+                Box b = Fields_box.box();
+                BoxIterator bit(b);
+                for (bit.begin(); bit.ok(); ++bit)
+                {
+                    // Must take the modular coordinate to assign ghost values correctly
+                    pout() << "Hello" << endl;
+                    IntVect iv = bit();
+                    Real laplacian_value = get_laplacian_psi(iv, Fields_box, a_dx[ilev]);
+                    pout() << "Laplacian worked" << endl;
+                    Ham_constraint += laplacian_value 
+                       - (pow(Fields_box(iv, c_psi_reg), 5) * pow(constant_K, 2) / 12.0 
+                       - M_PI * pow(Fields_box(iv, c_Pi_0), 2) * pow(Fields_box(iv, c_psi_reg), 5));
+                }
+            }
+
+            pout() << "The Hamiltonian constraint at level " << ilev << " is give by " << Ham_constraint << endl;
+        }
+} // end set_rhs
+*/
 /// This function outputs the final data after the solver is finished
 /// in a format that GRChombo can read in for an AMRTimeDependent run
 void output_final_data(const Vector<LevelData<FArrayBox> *> &a_multigrid_vars,
@@ -133,6 +213,17 @@ void output_final_data(const Vector<LevelData<FArrayBox> *> &a_multigrid_vars,
     string filename("InitialConditionsFinal.3d.hdf5");
 #endif
 
+    Correct_Pi(a_multigrid_vars, a_params);
+    // Hamiltonian_constraint(a_grids, a_multigrid_vars, a_vectDx, a_params, constant_K);
+    Vector<LevelData<FArrayBox> *> Ham = normalized_Ham_calc(a_grids, a_multigrid_vars, a_vectDx, a_params, constant_K);
+
+    int comp_val = 0;
+    Real integral = computeSum(Ham, a_params.refRatio, a_params.coarsestDx, Interval(comp_val, comp_val));
+ 
+    pout() << "---------------------------" << endl;
+    pout() << "Hamiltonian constraint is: " << integral << endl;
+
+    // Hamiltonian_constraint(a_grids, a_multigrid_vars, a_vectDx, a_params, constant_K);
     // set up full data and write to hdf5 file ready for GRChombo
     HDF5Handle handle(filename, HDF5Handle::CREATE);
     Vector<LevelData<FArrayBox> *> grchombo_vars(a_multigrid_vars.size(), NULL);

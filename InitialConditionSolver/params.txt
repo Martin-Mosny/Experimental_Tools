@@ -14,17 +14,17 @@ beta  = -1.0
 
 # AMR grid params - grid length and number of cells by direction
 L = 100.0
-N = 16 16 16
+N = 32 32 32
 # number of AMR refinement levels is max_level + 1
-max_level    = 2
+max_level    = 1
 # Threshold for AMR refinement, based on magnitude of rhs
 refine_threshold = 0.8
 #min box size
-block_factor = 8
+block_factor = 16
 #max box size
 max_grid_size = 16
 # how aggressively to regrid
-fill_ratio   = 0.5
+fill_ratio   = 0.7
 buffer_size  = 3
 
 # Setup multigrid params
@@ -33,10 +33,10 @@ numMGsmooth = 4 # number of GSRB smooths before and after MG coarsening
 num_mg     = 1 
 numMGIterations = 2 #this is the number of MG v-cycles in the preconditioner
 max_iterations = 100 #max number of solver iterations
-max_NL_iterations = 6 #non linear outside loop iterations
+max_NL_iterations = 9 #non linear outside loop iterations
 tolerance  = 1.0e-10  #solver tolerance for declaring convergence
 hang       = 1.0e-11  #solver tolerance for deciding when we're hung
-verbosity = 100 # higher number means more verbose output
+verbosity = 10 # higher number means more verbose output
 
 # how to average face-centered coefficients to coarser multigrid levels
 #coefficient_average_type = arithmetic
@@ -57,10 +57,13 @@ bc_value = 0.0
 G_Newton = 1.0 
 
 # scalar field input params
-phi_amplitude = 0.0001
+phi_amplitude = 0.000001
 phi_wavelength = 2
-Gaussian_init  = 2
-Gaussian_amplitude = 0.00001
+
+# Gaussian initial conditions; 1 if on, 0 if off.
+Gaussian_initial_conditions = 0
+Gaussian_init  = 0.1
+Gaussian_amplitude = 0.001
 
 # initial conditions for Binary BH spacetimes
 # (can be with or without periodic BCs, 

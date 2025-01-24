@@ -76,17 +76,17 @@ void set_binary_bh_Aij(FArrayBox &multigrid_vars_box, const IntVect &iv,
     RealVect P2 = {0.0, a_params.bh2_momentum, 0.0};
 
     // set the Aij vars
-    multigrid_vars_box(iv, c_A11_0) =
+    multigrid_vars_box(iv, c_A11_0) = 0 *
         get_Aij(0, 0, rbh1, rbh2, n1, n2, J1, J2, P1, P2, a_params);
-    multigrid_vars_box(iv, c_A22_0) =
+    multigrid_vars_box(iv, c_A22_0) = 0 * 
         get_Aij(1, 1, rbh1, rbh2, n1, n2, J1, J2, P1, P2, a_params);
-    multigrid_vars_box(iv, c_A33_0) =
+    multigrid_vars_box(iv, c_A33_0) = 0 * 
         get_Aij(2, 2, rbh1, rbh2, n1, n2, J1, J2, P1, P2, a_params);
-    multigrid_vars_box(iv, c_A12_0) =
+    multigrid_vars_box(iv, c_A12_0) = 0 * 
         get_Aij(0, 1, rbh1, rbh2, n1, n2, J1, J2, P1, P2, a_params);
-    multigrid_vars_box(iv, c_A13_0) =
+    multigrid_vars_box(iv, c_A13_0) = 0 * 
         get_Aij(0, 2, rbh1, rbh2, n1, n2, J1, J2, P1, P2, a_params);
-    multigrid_vars_box(iv, c_A23_0) =
+    multigrid_vars_box(iv, c_A23_0) = 0 * 
         get_Aij(1, 2, rbh1, rbh2, n1, n2, J1, J2, P1, P2, a_params);
 }
 

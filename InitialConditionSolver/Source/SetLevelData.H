@@ -76,4 +76,13 @@ extern void set_output_data(LevelData<FArrayBox> &a_vars,
                             const PoissonParameters &a_params,
                             const RealVect &a_dx, const Real &constant_K);
 
+void Hamiltonian_constraint(const Vector<DisjointBoxLayout> &a_grids, Vector<LevelData<FArrayBox> *> multigrid_vars, const Vector<RealVect> &a_dx,
+             const PoissonParameters &a_params, const Real constant_K);
+
+Vector<LevelData<FArrayBox> *> Ham_calc(const Vector<DisjointBoxLayout> &grids, Vector<LevelData<FArrayBox> *> multigrid_vars, const Vector<RealVect> &a_dx,
+             const PoissonParameters &a_params, const Real constant_K);
+
+Vector<LevelData<FArrayBox> *> normalized_Ham_calc(const Vector<DisjointBoxLayout> &grids, Vector<LevelData<FArrayBox> *> multigrid_vars, const Vector<RealVect> &a_dx,
+             const PoissonParameters &a_params, const Real constant_K);
+
 #endif

@@ -50,7 +50,8 @@ class PoissonParameters
     Real G_Newton;
     Real phi_amplitude;
     Real phi_wavelength;
-    int Gaussian_init;
+    int Gaussian_initial_conditions;
+    Real Gaussian_init;
     Real Gaussian_amplitude;
     Real bh1_bare_mass;
     Real bh2_bare_mass;

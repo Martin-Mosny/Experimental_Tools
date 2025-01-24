@@ -34,6 +34,9 @@
 static void enableFpExceptions();
 #endif
 
+// Set whether we are using Gaussian initial conditions or not
+//#define GAUSSIAN_INIT
+
 using std::cerr;
 
 // Sets up and runs the solver
@@ -102,9 +105,9 @@ int poissonSolve(const Vector<DisjointBoxLayout> &a_grids,
     }
 
     // Create Gaussian initial conditions
-    pout() << "HELLO" << endl;
+    #ifdef GAUSSIAN_INIT
     set_Gaussian_pi(multigrid_vars, a_params);
-    pout() << "END" << endl;
+    #endif
 
     // set up linear operator
     int lBase = 0;
@@ -182,7 +185,7 @@ int poissonSolve(const Vector<DisjointBoxLayout> &a_grids,
         // define the multi level operator
         mlOp.define(a_grids, a_params.refRatio, vectDomains, vectDx, opFactory,
                     lBase);
-
+        
         // set the more solver params
         bool homogeneousBC = false;
         solver.define(&mlOp, homogeneousBC);

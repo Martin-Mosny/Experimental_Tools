@@ -38,6 +38,7 @@ void getPoissonParameters(PoissonParameters &a_params)
     pp.get("G_Newton", a_params.G_Newton);
     pp.get("phi_amplitude", a_params.phi_amplitude);
     pp.get("phi_wavelength", a_params.phi_wavelength);
+    pp.get("Gaussian_initial_conditions", a_params.Gaussian_initial_conditions);
     pp.get("Gaussian_init", a_params.Gaussian_init);
     pp.get("Gaussian_amplitude", a_params.Gaussian_amplitude);
 
